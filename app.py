@@ -2,7 +2,7 @@ import ast
 import os
 import openai
 import requests
-from flask import Flask,jsonify
+from flask import Flask
 import google.generativeai as genai
 from dotenv import load_dotenv
 load_dotenv()
@@ -87,47 +87,43 @@ def getResponseFromAI():
 
     if data['use'] == 'Gemini':
         list_data = data['list']['data']
-        modified_prompts = {}
+
+        modified_prompts = []
 
         for item in list_data:
             modified_prompt = data['prompt'].replace('column1', item['column1']).replace('column2', item['column2'])
-            modified_prompts[item['id']] = modified_prompt
+            modified_prompts.append(modified_prompt)
 
-        result_list = []
+        result_dict = {}
 
-        for id, prompt in modified_prompts.items():
-            response = get_gemini_response(prompt)
-            result_list.append({'id': id, 'response': response})
+        count = 0
 
-        url_to_send = 'http://samurai3.keenetic.link/csv/ai_new_endpoint.php'
+        for prompt in modified_prompts:
+            result_dict[f"prompt{count}"] = get_gemini_response(prompt)
+            count +=1
 
-        response = requests.post(url_to_send, json=result_list)
-
-        return jsonify(result_list)
+        return result_dict
     
     else:
 
         list_data = data['list']['data']
-        modified_prompts = {}
+
+        modified_prompts = []
 
         for item in list_data:
             modified_prompt = data['prompt'].replace('column1', item['column1']).replace('column2', item['column2'])
-            modified_prompts[item['id']] = modified_prompt
+            modified_prompts.append(modified_prompt)
 
-        result_list = []
+        result_dict = {}
 
-        for id, prompt in modified_prompts.items():
-            print(id)
-            response = get_openai_response(prompt)
-            result_list.append({'id': id, 'response': response})
+        count = 0
 
-        url_to_send = 'http://samurai3.keenetic.link/csv/ai_new_endpoint.php'
+        for prompt in modified_prompts:
+            result_dict[f"prompt{count}"] = get_openai_response(prompt)
+            count +=1
 
-        response = requests.post(url_to_send, json=result_list)
-
-
-        return jsonify(result_list)
+        return result_dict
 
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run()
