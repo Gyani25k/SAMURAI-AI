@@ -2,7 +2,7 @@ import ast
 import os
 import openai
 import requests
-from flask import Flask
+from flask import Flask,jsonify
 import google.generativeai as genai
 from dotenv import load_dotenv
 load_dotenv()
@@ -87,42 +87,46 @@ def getResponseFromAI():
 
     if data['use'] == 'Gemini':
         list_data = data['list']['data']
-
-        modified_prompts = []
+        modified_prompts = {}
 
         for item in list_data:
             modified_prompt = data['prompt'].replace('column1', item['column1']).replace('column2', item['column2'])
-            modified_prompts.append(modified_prompt)
+            modified_prompts[item['id']] = modified_prompt
 
-        result_dict = {}
+        result_list = []
 
-        count = 0
+        for id, prompt in modified_prompts.items():
+            response = get_gemini_response(prompt)
+            result_list.append({'id': id, 'response': response})
 
-        for prompt in modified_prompts:
-            result_dict[f"prompt{count}"] = get_gemini_response(prompt)
-            count +=1
+        url_to_send = 'http://samurai3.keenetic.link/csv/ai_new_endpoint.php'
 
-        return result_dict
+        response = requests.post(url_to_send, json=result_list)
+
+        return jsonify(result_list)
     
     else:
 
         list_data = data['list']['data']
-
-        modified_prompts = []
+        modified_prompts = {}
 
         for item in list_data:
             modified_prompt = data['prompt'].replace('column1', item['column1']).replace('column2', item['column2'])
-            modified_prompts.append(modified_prompt)
+            modified_prompts[item['id']] = modified_prompt
 
-        result_dict = {}
+        result_list = []
 
-        count = 0
+        for id, prompt in modified_prompts.items():
+            print(id)
+            response = get_openai_response(prompt)
+            result_list.append({'id': id, 'response': response})
 
-        for prompt in modified_prompts:
-            result_dict[f"prompt{count}"] = get_openai_response(prompt)
-            count +=1
+        url_to_send = 'http://samurai3.keenetic.link/csv/ai_new_endpoint.php'
 
-        return result_dict
+        response = requests.post(url_to_send, json=result_list)
+
+
+        return jsonify(result_list)
 
 
 if __name__ == '__main__':
