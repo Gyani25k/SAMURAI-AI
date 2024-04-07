@@ -40,15 +40,17 @@ def get_data(url):
             if response.status_code == 200:
                 try:
                     data = response.json()
+                    limit_response = data['limit']
                 except ValueError:
                     return {"error": "Invalid JSON response", "site_status": response.status_code}
                 else:
-                    return data
+                    return data , limit_response
             else:
                 return {"site_status": response.status_code}
             
     except Exception as e:
         return {"error": str(e), "site_status": 500}
+    
     
 # FUNCTION TO GET RESPONSE VIA GEMINI MODEL
 
@@ -83,20 +85,31 @@ def get_openai_response(user_prompt):
 
 @app.route('/getResponseFromAI')
 def getResponseFromAI():
-    data = get_data(URL)
+    data,limit_response = get_data(URL)
+    print(limit_response)
 
     if data['use'] == 'Gemini':
         list_data = data['list']['data']
+        list_data = list_data[:limit_response]
+
         modified_prompts = {}
 
         for item in list_data:
-            modified_prompt = data['prompt'].replace('column1', item['column1']).replace('column2', item['column2'])
+            modified_prompt = data['prompt']
+            if 'column1' not in modified_prompt and 'column2' not in modified_prompt:
+                modified_prompt += f" {item['column1']} & {item['column2']}"
+            else:
+                modified_prompt = modified_prompt.replace('column1', item['column1']).replace('column2', item['column2'])
+
             modified_prompts[item['id']] = modified_prompt
+
 
         result_list = []
 
         for id, prompt in modified_prompts.items():
+            print(id)
             response = get_gemini_response(prompt)
+            print(response)
             result_list.append({'id': id, 'response': response})
 
         url_to_send = 'http://samurai3.keenetic.link/csv/ai_new_endpoint.php'
@@ -108,11 +121,18 @@ def getResponseFromAI():
     else:
 
         list_data = data['list']['data']
+        list_data = list_data[:limit_response]
+        
         modified_prompts = {}
-
         for item in list_data:
-            modified_prompt = data['prompt'].replace('column1', item['column1']).replace('column2', item['column2'])
+            modified_prompt = data['prompt']
+            if 'column1' not in modified_prompt and 'column2' not in modified_prompt:
+                modified_prompt += f" {item['column1']} & {item['column2']}"
+            else:
+                modified_prompt = modified_prompt.replace('column1', item['column1']).replace('column2', item['column2'])
+
             modified_prompts[item['id']] = modified_prompt
+
 
         result_list = []
 
