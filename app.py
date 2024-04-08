@@ -1,152 +1,97 @@
+from flask import Flask, jsonify, request
+import requests
 import ast
 import os
 import openai
-import requests
-from flask import Flask,jsonify
 import google.generativeai as genai
 from dotenv import load_dotenv
-load_dotenv()
 
+load_dotenv()
 app = Flask(__name__)
 
-
-# GEMINI AI API CONFRIGUATION
-
+# GEMINI AI API CONFIGURATION
 GOOGLE_API_KEY = os.getenv('GEMINI_API_KEY')
-
 genai.configure(api_key=GOOGLE_API_KEY)
-
 GEMINI_MODEL = genai.GenerativeModel('gemini-pro')
 
-# GPT AI API CONFRIGUATION
-
+# GPT AI API CONFIGURATION
 GPT_API_KEY = os.getenv('OPENAI_API_KEY')
-
 openai.api_key = GPT_API_KEY
-
 GPT_MODEL = "gpt-3.5-turbo"
 
-
 # BASE URL
+URL = 'http://samurai3.keenetic.link/csv/ai_new_queue.php'
 
-URL = 'http://samurai3.keenetic.link/csv/ai_new_queue.php?check=1'
-
-
-# FUNCTION TO GET DATA FROM URL
-
-def get_data(url):
+# Function to get data from URL with pagination
+def get_data(url, offset, limit):
     try:
-        with requests.get(url) as response:
+        params = {'offset': offset, 'limit': limit}
+        with requests.get(url, params=params) as response:
             if response.status_code == 200:
-                try:
-                    data = response.json()
-                    limit_response = data['limit']
-                except ValueError:
-                    return {"error": "Invalid JSON response", "site_status": response.status_code}
-                else:
-                    return data , limit_response
+                data = response.json()
+                return data
             else:
-                return {"site_status": response.status_code}
-            
+                return {"error": "Failed to fetch data", "site_status": response.status_code}
     except Exception as e:
         return {"error": str(e), "site_status": 500}
-    
-    
-# FUNCTION TO GET RESPONSE VIA GEMINI MODEL
 
+# Function to get response via Gemini model
 def get_gemini_response(user_prompt):
-    extracted_text = ''
     try:
         response = GEMINI_MODEL.generate_content(user_prompt)
         result = str(response.parts[0])
         extracted_text = ast.literal_eval(result.split(':', 1)[1].strip())
-
+        return extracted_text
     except Exception as e:
-        extracted_text = str(e)
+        return str(e)
 
-    return extracted_text        
-
-# FUNCTION TO GET RESPONSE VIA GPT MODEL
-
+# Function to get response via GPT model
 def get_openai_response(user_prompt):
-    response = openai.chat.completions.create(
-        model="gpt-3.5-turbo",
-        messages=[
-            {"role": "user", "content": user_prompt},
-        ]
-    )
-    data1 = dict(response)
-    data2 = dict(data1['choices'][0])
-    data3 = dict(data2['message'])
+    try:
+        response = openai.ChatCompletion.create(
+            model=GPT_MODEL,
+            messages=[
+                {"role": "user", "content": user_prompt},
+            ]
+        )
+        data1 = dict(response)
+        data2 = dict(data1['choices'][0])
+        data3 = dict(data2['message'])
+        return data3['content']
+    except Exception as e:
+        return str(e)
 
-    return data3['content']
-
-
-
-@app.route('/getResponseFromAI')
-def getResponseFromAI():
-    data,limit_response = get_data(URL)
-    print(limit_response)
-
-    if data['use'] == 'Gemini':
-        list_data = data['list']['data']
-        list_data = list_data[:limit_response]
-
-        modified_prompts = {}
-
-        for item in list_data:
-            modified_prompt = data['prompt']
-            if 'column1' not in modified_prompt and 'column2' not in modified_prompt:
-                modified_prompt += f" {item['column1']} & {item['column2']}"
-            else:
-                modified_prompt = modified_prompt.replace('column1', item['column1']).replace('column2', item['column2'])
-
-            modified_prompts[item['id']] = modified_prompt
-
-
-        result_list = []
-
-        for id, prompt in modified_prompts.items():
-            print(id)
-            response = get_gemini_response(prompt)
-            print(response)
-            result_list.append({'id': id, 'response': response})
-
-        url_to_send = 'http://samurai3.keenetic.link/csv/ai_new_endpoint.php'
-
-        response = requests.post(url_to_send, json=result_list)
-
-        return jsonify(result_list)
+@app.route('/getResponseFromAI', methods=['GET'])
+def get_response_from_ai():
+    offset = int(request.args.get('offset', 0))
+    limit = int(request.args.get('limit', 100))
     
-    else:
+    data = get_data(URL, offset, limit)
+    
+    if 'error' in data:
+        return jsonify({"error": "Failed to fetch data"}), 500
 
-        list_data = data['list']['data']
-        list_data = list_data[:limit_response]
-        
-        modified_prompts = {}
-        for item in list_data:
-            modified_prompt = data['prompt']
-            if 'column1' not in modified_prompt and 'column2' not in modified_prompt:
-                modified_prompt += f" {item['column1']} & {item['column2']}"
-            else:
-                modified_prompt = modified_prompt.replace('column1', item['column1']).replace('column2', item['column2'])
+    task_list = data['list']['data']
+    responses = []
 
-            modified_prompts[item['id']] = modified_prompt
+    for item in task_list:
+        modified_prompt = data['prompt']
+        if 'column1' not in modified_prompt and 'column2' not in modified_prompt:
+            modified_prompt += f" {item['column1']} & {item['column2']}"
+        else:
+            modified_prompt = modified_prompt.replace('column1', item['column1']).replace('column2', item['column2'])
 
+        if data['use'] == 'Gemini':
+            response = get_gemini_response(modified_prompt)
+        else:
+            response = get_openai_response(modified_prompt)
 
-        result_list = []
+        responses.append({'id': item['id'], 'response': response})
 
-        for id, prompt in modified_prompts.items():
-            print(id)
-            response = get_openai_response(prompt)
-            result_list.append({'id': id, 'response': response})
+    url_to_send = 'http://samurai3.keenetic.link/csv/ai_new_endpoint.php'
+    response = requests.post(url_to_send, json=responses)
 
-        url_to_send = 'http://samurai3.keenetic.link/csv/ai_new_endpoint.php'
-
-        response = requests.post(url_to_send, json=result_list)
-
-        return jsonify(result_list)
-
+    return jsonify(responses)
 
 if __name__ == '__main__':
     app.run(debug=True)
