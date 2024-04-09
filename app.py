@@ -17,6 +17,7 @@ GEMINI_MODEL = genai.GenerativeModel('gemini-pro')
 # GPT AI API CONFIGURATION
 GPT_API_KEY = os.getenv('OPENAI_API_KEY')
 openai.api_key = GPT_API_KEY
+GPT4_MODEL = "gpt-4"
 GPT_MODEL = "gpt-3.5-turbo"
 
 # BASE URL
@@ -60,6 +61,22 @@ def get_openai_response(user_prompt):
         return data3['content']
     except Exception as e:
         return str(e)
+    
+# Function to get response via GPT model
+def get_openai_response_GPT4(user_prompt):
+    try:
+        response = openai.ChatCompletion.create(
+            model=GPT4_MODEL,
+            messages=[
+                {"role": "user", "content": user_prompt},
+            ]
+        )
+        data1 = dict(response)
+        data2 = dict(data1['choices'][0])
+        data3 = dict(data2['message'])
+        return data3['content']
+    except Exception as e:
+        return str(e)
 
 @app.route('/getResponseFromAI', methods=['GET'])
 def get_response_from_ai():
@@ -75,6 +92,8 @@ def get_response_from_ai():
     responses = []
 
     for item in task_list:
+        print(item['id'])
+        print(item['job_id'])
         modified_prompt = data['prompt']
         if 'column1' not in modified_prompt and 'column2' not in modified_prompt:
             modified_prompt += f" {item['column1']} & {item['column2']}"
@@ -83,10 +102,14 @@ def get_response_from_ai():
 
         if data['use'] == 'Gemini':
             response = get_gemini_response(modified_prompt)
-        else:
+        if data['use'] == 'GPT3':
             response = get_openai_response(modified_prompt)
-
-        responses.append({'id': item['id'], 'response': response})
+        if data['use'] == 'GPT4':
+            response = get_openai_response_GPT4(modified_prompt)
+            pass
+        
+        print(response)
+        responses.append({'job_id':item['job_id'],'id': item['id'], 'response': response})
 
     url_to_send = 'http://samurai3.keenetic.link/csv/ai_new_endpoint.php'
     response = requests.post(url_to_send, json=responses)
