@@ -35,6 +35,7 @@ def get_data(url, offset, limit):
                 return {"error": "Failed to fetch data", "site_status": response.status_code}
     except Exception as e:
         return {"error": str(e), "site_status": 500}
+    
 
 # Function to get response via Gemini model
 def get_gemini_response(user_prompt):
@@ -45,6 +46,7 @@ def get_gemini_response(user_prompt):
         return extracted_text
     except Exception as e:
         return str(e)
+
 
 # Function to get response via GPT model
 def get_openai_response(user_prompt):
@@ -78,7 +80,7 @@ def get_openai_response_GPT4(user_prompt):
     except Exception as e:
         return str(e)
 
-@app.route('/getResponseFromAI', methods=['GET'])
+@app.route('/getAllResponseFromAI', methods=['GET'])
 def get_response_from_ai():
     offset = int(request.args.get('offset', 0))
     limit = int(request.args.get('limit', 100))
@@ -115,6 +117,85 @@ def get_response_from_ai():
     response = requests.post(url_to_send, json=responses)
 
     return jsonify(responses)
+
+@app.route('/getthreeResponseFromAI', methods=['GET'])
+def get_response_from_ai_preview():
+    offset = int(request.args.get('offset', 0))
+    limit = int(request.args.get('limit', 3))
+    
+    data = get_data(URL, offset, 3)
+    
+    if 'error' in data:
+        return jsonify({"error": "Failed to fetch data"}), 500
+
+    task_list = data['list']['data']
+    responses = []
+
+    for item in task_list:
+        print(item['id'])
+        print(item['job_id'])
+        modified_prompt = data['prompt']
+        if 'column1' not in modified_prompt and 'column2' not in modified_prompt:
+            modified_prompt += f" {item['column1']} & {item['column2']}"
+        else:
+            modified_prompt = modified_prompt.replace('column1', item['column1']).replace('column2', item['column2'])
+
+        if data['use'] == 'Gemini':
+            response = get_gemini_response(modified_prompt)
+        if data['use'] == 'GPT3':
+            response = get_openai_response(modified_prompt)
+        if data['use'] == 'GPT4':
+            response = get_openai_response_GPT4(modified_prompt)
+            pass
+        
+        print(response)
+        responses.append({'job_id':item['job_id'],'id': item['id'], 'response': response})
+
+    url_to_send = 'http://samurai3.keenetic.link/csv/ai_new_endpoint.php'
+    response = requests.post(url_to_send, json=responses)
+
+    return jsonify(responses)
+
+
+@app.route('/getFifteenResponseFromAI', methods=['GET'])
+def get_response_from_ai_fifteen():
+    offset = int(request.args.get('offset', 0))
+    limit = int(request.args.get('limit', 15))
+    
+    data = get_data(URL, offset, 15)
+    
+    if 'error' in data:
+        return jsonify({"error": "Failed to fetch data"}), 500
+
+    task_list = data['list']['data']
+    responses = []
+
+    for item in task_list:
+        print(item['id'])
+        print(item['job_id'])
+        modified_prompt = data['prompt']
+        if 'column1' not in modified_prompt and 'column2' not in modified_prompt:
+            modified_prompt += f" {item['column1']} & {item['column2']}"
+        else:
+            modified_prompt = modified_prompt.replace('column1', item['column1']).replace('column2', item['column2'])
+
+        if data['use'] == 'Gemini':
+            response = get_gemini_response(modified_prompt)
+        if data['use'] == 'GPT3':
+            response = get_openai_response(modified_prompt)
+        if data['use'] == 'GPT4':
+            response = get_openai_response_GPT4(modified_prompt)
+            pass
+        
+        print(response)
+        responses.append({'job_id':item['job_id'],'id': item['id'], 'response': response})
+
+    url_to_send = 'http://samurai3.keenetic.link/csv/ai_new_endpoint.php'
+    
+    response = requests.post(url_to_send, json=responses)
+
+    return jsonify(responses)
+
 
 if __name__ == '__main__':
     app.run(debug=True)
