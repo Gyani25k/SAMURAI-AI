@@ -7,6 +7,8 @@ import google.generativeai as genai
 from dotenv import load_dotenv
 
 load_dotenv()
+
+print(openai.__version__)
 app = Flask(__name__)
 
 # GEMINI AI API CONFIGURATION
@@ -182,7 +184,7 @@ def get_response_from_ai():
 
     return jsonify(responses)
 
-@app.route('/getthreeResponseFromAI', methods=['GET'])
+@app.route('/getthreeResponseFromAI', methods=['POST'])
 def get_response_from_ai_preview():
     """
     Gets a preview of responses from AI models based on data fetched from a URL.
@@ -194,20 +196,18 @@ def get_response_from_ai_preview():
       >>> get_response_from_ai_preview()
       {'list': {'data': [{'id': 1, 'job_id': 1, 'column1': 'data1', 'column2': 'data2'}]}, 'prompt': 'This is a prompt', 'use': 'Gemini'}
     """
-    offset = int(request.args.get('offset', 0))
-    limit = int(request.args.get('limit', 3))
-    
-    data = get_data(URL, offset, 3)
-    
+    data = request.json
+
+        
     if 'error' in data:
         return jsonify({"error": "Failed to fetch data"}), 500
-
+    
     task_list = data['list']['data']
+
     responses = []
 
     for item in task_list:
-        print(item['id'])
-        print(item['job_id'])
+
         modified_prompt = data['prompt']
         if 'column1' not in modified_prompt and 'column2' not in modified_prompt:
             modified_prompt += f" {item['column1']} & {item['column2']}"
@@ -225,13 +225,11 @@ def get_response_from_ai_preview():
         print(response)
         responses.append({'job_id':item['job_id'],'id': item['id'], 'response': response})
 
-    url_to_send = 'http://samurai3.keenetic.link/csv/ai_new_endpoint.php'
-    response = requests.post(url_to_send, json=responses)
 
     return jsonify(responses)
 
 
-@app.route('/getFifteenResponseFromAI', methods=['GET'])
+@app.route('/getFifteenResponseFromAI', methods=['POST'])
 def get_response_from_ai_fifteen():
     """
     Gets 15 responses from AI models based on data fetched from a URL.
@@ -243,20 +241,19 @@ def get_response_from_ai_fifteen():
       >>> get_response_from_ai_fifteen()
       {'list': {'data': [{'id': 1, 'job_id': 1, 'column1': 'data1', 'column2': 'data2'}]}, 'prompt': 'This is a prompt', 'use': 'Gemini'}
     """
-    offset = int(request.args.get('offset', 0))
-    limit = int(request.args.get('limit', 15))
-    
-    data = get_data(URL, offset, 15)
-    
+    data = request.json
+    print(data)
+
+        
     if 'error' in data:
         return jsonify({"error": "Failed to fetch data"}), 500
-
+    
     task_list = data['list']['data']
+
     responses = []
 
     for item in task_list:
-        print(item['id'])
-        print(item['job_id'])
+
         modified_prompt = data['prompt']
         if 'column1' not in modified_prompt and 'column2' not in modified_prompt:
             modified_prompt += f" {item['column1']} & {item['column2']}"
@@ -274,9 +271,6 @@ def get_response_from_ai_fifteen():
         print(response)
         responses.append({'job_id':item['job_id'],'id': item['id'], 'response': response})
 
-    url_to_send = 'http://samurai3.keenetic.link/csv/ai_new_endpoint.php'
-    
-    response = requests.post(url_to_send, json=responses)
 
     return jsonify(responses)
 
